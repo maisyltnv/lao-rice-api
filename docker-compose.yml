@@ -1,0 +1,46 @@
+name: lao-rice-api
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lao-rice-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lao_rice
+    ports:
+      - "5433:5432"
+    volumes:
+      - lao_rice_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lao_rice"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lao-rice-api
+    image: lao-rice-api:latest
+    ports:
+      - "${API_PORT:-8081}:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://postgres:postgres@db:5432/lao_rice?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-long-random-secret}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-72}
+      SHIPPING_FEE_LAK: ${SHIPPING_FEE_LAK:-30000}
+      FREE_SHIPPING_MIN_SUBTOTAL_LAK: ${FREE_SHIPPING_MIN_SUBTOTAL_LAK:-500000}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - lao_rice_uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  lao_rice_pgdata:
+  lao_rice_uploads:

@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+.dockerignore
+Dockerfile
+docker-compose*.yml
+.mcps
+terminals
+**/.cursor
+**/agent-transcripts
