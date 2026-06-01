@@ -55,5 +55,13 @@ sleep 2
 sudo -n systemctl is-active --quiet "$SERVICE"
 
 echo "==> Health check"
-curl -sf "http://127.0.0.1:${PORT:-8081}/health" >/dev/null
-echo "Deploy OK"
+HEALTH_URL="http://127.0.0.1:${PORT:-8081}/health"
+for i in $(seq 1 15); do
+  if curl -sf "$HEALTH_URL" >/dev/null; then
+    echo "Deploy OK"
+    exit 0
+  fi
+  sleep 2
+done
+echo "Health check failed: $HEALTH_URL"
+exit 1
