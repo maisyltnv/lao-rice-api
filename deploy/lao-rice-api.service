@@ -1,0 +1,15 @@
+[Unit]
+Description=Lao Rice API
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lao-rice-api
+EnvironmentFile=/opt/lao-rice-api/.env
+ExecStart=/usr/local/bin/lao-rice-api
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
