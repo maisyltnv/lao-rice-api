@@ -133,6 +133,10 @@ echo "==> Build binary"
 go mod download
 go build -o /usr/local/bin/lao-rice-api ./cmd/server
 
+DEPLOY_USER="${SUDO_USER:-deploy}"
+if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_USER="deploy"; fi
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+
 echo "==> Install systemd service"
 cp deploy/lao-rice-api.service /etc/systemd/system/lao-rice-api.service
 systemctl daemon-reload

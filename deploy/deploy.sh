@@ -6,6 +6,7 @@ SERVICE="lao-rice-api"
 GITHUB_KEY="${GITHUB_KEY:-$HOME/.ssh/github_lao_rice}"
 
 cd "$APP_DIR"
+chmod +x deploy/deploy.sh 2>/dev/null || true
 
 if [ -f "$GITHUB_KEY" ]; then
   export GIT_SSH_COMMAND="ssh -i $GITHUB_KEY -o StrictHostKeyChecking=accept-new"
@@ -45,9 +46,9 @@ echo "==> Build API"
 /usr/local/go/bin/go build -o /usr/local/bin/lao-rice-api ./cmd/server
 
 echo "==> Restart service"
-systemctl restart "$SERVICE"
+sudo systemctl restart "$SERVICE"
 sleep 2
-systemctl is-active --quiet "$SERVICE"
+sudo systemctl is-active --quiet "$SERVICE"
 
 echo "==> Health check"
 curl -sf "http://127.0.0.1:${PORT:-8081}/health" >/dev/null
