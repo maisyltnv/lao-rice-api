@@ -45,6 +45,10 @@ echo "==> Build API"
 /usr/local/go/bin/go mod download
 /usr/local/go/bin/go build -o "$BIN" ./cmd/server
 
+echo "==> Install systemd unit (if ExecStart path changed)"
+sudo -n cp deploy/lao-rice-api.service /etc/systemd/system/lao-rice-api.service
+sudo -n systemctl daemon-reload
+
 echo "==> Restart service"
 sudo -n systemctl restart "$SERVICE"
 sleep 2
