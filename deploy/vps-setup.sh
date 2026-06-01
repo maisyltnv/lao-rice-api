@@ -129,9 +129,14 @@ if ! dc exec -T -e PGPASSWORD="$DB_PASSWORD" db psql -U postgres -d lao_rice -tA
   go run ./cmd/seed
 fi
 
+mkdir -p "$APP_DIR/bin"
 echo "==> Build binary"
 go mod download
-go build -o /usr/local/bin/lao-rice-api ./cmd/server
+go build -o "$APP_DIR/bin/lao-rice-api" ./cmd/server
+
+DEPLOY_USER="${SUDO_USER:-deploy}"
+if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_USER="deploy"; fi
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 
 DEPLOY_USER="${SUDO_USER:-deploy}"
 if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_USER="deploy"; fi

@@ -7,7 +7,7 @@ Requires=docker.service
 Type=simple
 WorkingDirectory=/opt/lao-rice-api
 EnvironmentFile=/opt/lao-rice-api/.env
-ExecStart=/usr/local/bin/lao-rice-api
+ExecStart=/opt/lao-rice-api/bin/lao-rice-api
 Restart=always
 RestartSec=5
 

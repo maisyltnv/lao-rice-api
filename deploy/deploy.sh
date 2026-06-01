@@ -3,10 +3,12 @@ set -euo pipefail
 
 APP_DIR="/opt/lao-rice-api"
 SERVICE="lao-rice-api"
+BIN="$APP_DIR/bin/lao-rice-api"
 GITHUB_KEY="${GITHUB_KEY:-$HOME/.ssh/github_lao_rice}"
 
 cd "$APP_DIR"
 chmod +x deploy/deploy.sh 2>/dev/null || true
+mkdir -p "$APP_DIR/bin"
 
 if [ -f "$GITHUB_KEY" ]; then
   export GIT_SSH_COMMAND="ssh -i $GITHUB_KEY -o StrictHostKeyChecking=accept-new"
@@ -25,11 +27,9 @@ dc() {
 }
 
 echo "==> Start PostgreSQL"
-dc down 2>/dev/null || true
-docker rm -f lao-rice-db 2>/dev/null || true
 if ! dc up -d db; then
   echo "Retrying after Docker restart..."
-  systemctl restart docker || true
+  sudo -n systemctl restart docker || true
   sleep 8
   dc up -d db
 fi
@@ -43,12 +43,12 @@ done
 
 echo "==> Build API"
 /usr/local/go/bin/go mod download
-/usr/local/go/bin/go build -o /usr/local/bin/lao-rice-api ./cmd/server
+/usr/local/go/bin/go build -o "$BIN" ./cmd/server
 
 echo "==> Restart service"
-sudo systemctl restart "$SERVICE"
+sudo -n systemctl restart "$SERVICE"
 sleep 2
-sudo systemctl is-active --quiet "$SERVICE"
+sudo -n systemctl is-active --quiet "$SERVICE"
 
 echo "==> Health check"
 curl -sf "http://127.0.0.1:${PORT:-8081}/health" >/dev/null
