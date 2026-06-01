@@ -3,6 +3,7 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,4 +15,5 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          script: /opt/lao-rice-api/deploy/deploy.sh
+          command_timeout: 20m
+          script: bash /opt/lao-rice-api/deploy/deploy.sh
