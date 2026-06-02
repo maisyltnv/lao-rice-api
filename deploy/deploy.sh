@@ -14,14 +14,25 @@ if [ -f "$GITHUB_KEY" ]; then
   export GIT_SSH_COMMAND="ssh -i $GITHUB_KEY -o StrictHostKeyChecking=accept-new"
 fi
 
-ENV_BACKUP="$(mktemp)"
-if [ -f "$APP_DIR/.env" ]; then
+DEPLOY_SCRIPT="$APP_DIR/deploy/deploy.sh"
+ENV_BACKUP="${ENV_BACKUP:-$(mktemp)}"
+if [ -z "${DEPLOY_REEXEC:-}" ] && [ -f "$APP_DIR/.env" ]; then
   cp "$APP_DIR/.env" "$ENV_BACKUP"
 fi
+
+_cksum_before=""
+[ -f "$DEPLOY_SCRIPT" ] && _cksum_before="$(cksum "$DEPLOY_SCRIPT" | awk '{print $1}')"
 
 echo "==> Pull latest main"
 git fetch origin main
 git reset --hard origin/main
+
+_cksum_after="$(cksum "$DEPLOY_SCRIPT" | awk '{print $1}')"
+if [ -n "$_cksum_before" ] && [ "$_cksum_before" != "$_cksum_after" ] && [ -z "${DEPLOY_REEXEC:-}" ]; then
+  echo "==> deploy.sh updated — re-run with new script"
+  export DEPLOY_REEXEC=1
+  exec env ENV_BACKUP="$ENV_BACKUP" DEPLOY_REEXEC=1 bash "$DEPLOY_SCRIPT"
+fi
 
 echo "==> Restore production .env (never commit .env to git)"
 API_PORT="${PORT:-8081}"
