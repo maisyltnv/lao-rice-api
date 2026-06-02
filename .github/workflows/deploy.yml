@@ -17,3 +17,37 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 20m
           script: bash /opt/lao-rice-api/deploy/deploy.sh
+
+      # ຂັ້ນທີ 4: ແຈ້ງ Telegram ຫຼັງ deploy (ຕ້ອງຕັ້ງ TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID ໃນ GitHub Secrets)
+      - name: Notify Telegram (success)
+        if: success()
+        continue-on-error: true
+        run: |
+          MSG="✅ lao-rice-api deploy ສຳເລັດ
+
+          Commit: ${{ github.event.head_commit.message || github.sha }}
+          By: ${{ github.actor }}
+          Log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "text=${MSG}"
+
+      - name: Notify Telegram (failed)
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          LOG=$(gh run view "${{ github.run_id }}" --repo "${{ github.repository }}" --log-failed 2>&1 | tail -30 | sed 's/\r$//' || echo "(ອ່ານ log ບໍ່ໄດ້)")
+          MSG="❌ lao-rice-api deploy ລົ້ມ
+
+          Commit: ${{ github.event.head_commit.message || github.sha }}
+          By: ${{ github.actor }}
+          ເປີດ log ເຕັມ: ${RUN_URL}
+
+          --- ທ້າຍ log ---
+          ${LOG}"
+          curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            --data-urlencode "text=${MSG}"
