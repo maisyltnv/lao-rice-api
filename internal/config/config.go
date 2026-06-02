@@ -15,6 +15,7 @@ type Config struct {
 	FreeShippingMinSubtotalLAK float64
 	UploadDir                  string
 	UploadURLPrefix            string
+	ImagesDir                  string
 }
 
 // Load reads configuration from environment variables with sensible defaults for local dev.
@@ -34,6 +35,7 @@ func Load() Config {
 		FreeShippingMinSubtotalLAK: getenvFloat("FREE_SHIPPING_MIN_SUBTOTAL_LAK", 500000),
 		UploadDir:                  getenv("UPLOAD_DIR", "uploads"),
 		UploadURLPrefix:            getenv("UPLOAD_URL_PREFIX", "/uploads"),
+		ImagesDir:                  getenv("IMAGES_DIR", "images"),
 	}
 }
 

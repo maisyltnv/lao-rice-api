@@ -50,7 +50,7 @@ func main() {
 	exchangeH := handler.NewExchangeRateHandler(exchangeSvc)
 	bannerH := handler.NewBannerHandler(bannerSvc)
 
-	r := router.New(authSvc, authH, categoryH, productH, orderH, exchangeH, bannerH, cfg.UploadDir)
+	r := router.New(authSvc, authH, categoryH, productH, orderH, exchangeH, bannerH, cfg.UploadDir, cfg.ImagesDir)
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{

@@ -20,6 +20,7 @@ func New(
 	exchangeH *handler.ExchangeRateHandler,
 	bannerH *handler.BannerHandler,
 	uploadDir string,
+	imagesDir string,
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -45,6 +46,9 @@ func New(
 
 	if uploadDir != "" {
 		r.Static("/uploads", uploadDir)
+	}
+	if imagesDir != "" {
+		r.Static("/images", imagesDir)
 	}
 
 	authGroup := r.Group("/auth")

@@ -5,41 +5,47 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# ຢ່າ deploy web + api ພ້ອກັນເວລາເດຍວ — VPS ອາດຊ້າ/ລົ້ມ
+concurrency:
+  group: vps-deploy-62.171.159.75
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 20m
-          script: bash /opt/lao-rice-api/deploy/deploy.sh
+          script: |
+            cd /opt/lao-rice-api
+            git fetch origin main
+            git reset --hard origin/main
+            bash deploy/deploy.sh
 
-      # ຂັ້ນທີ 4: ແຈ້ງ Telegram ຫຼັງ deploy (ຕ້ອງຕັ້ງ TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID ໃນ GitHub Secrets)
       - name: Notify Telegram (success)
-        if: success()
+        if: success() && steps.deploy.outcome == 'success'
         continue-on-error: true
         run: |
-          MSG="✅ lao-rice-api deploy ສຳເລັດ
-
-          Commit: ${{ github.event.head_commit.message || github.sha }}
-          By: ${{ github.actor }}
-          Log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            --data-urlencode "text=${MSG}"
+            -d disable_web_page_preview=true \
+            --data-urlencode "text=✅ lao-rice-api deploy ສຳເລັດ"
 
       - name: Notify Telegram (failed)
-        if: failure()
+        if: failure() && steps.deploy.outcome == 'failure'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          sleep 20
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          LOG=$(gh run view "${{ github.run_id }}" --repo "${{ github.repository }}" --log-failed 2>&1 | tail -30 | sed 's/\r$//' || echo "(ອ່ານ log ບໍ່ໄດ້)")
+          LOG=$(gh run view "${{ github.run_id }}" --repo "${{ github.repository }}" --log-failed 2>&1 | tail -35 | sed 's/\r$//' || echo "(ອ່ານ log ບໍ່ໄດ້ — ເປີດ link ຂ້າງເທິງ)")
           MSG="❌ lao-rice-api deploy ລົ້ມ
 
           Commit: ${{ github.event.head_commit.message || github.sha }}

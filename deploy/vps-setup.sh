@@ -82,9 +82,11 @@ SHIPPING_FEE_LAK=30000
 FREE_SHIPPING_MIN_SUBTOTAL_LAK=500000
 UPLOAD_DIR=${APP_DIR}/uploads
 UPLOAD_URL_PREFIX=/uploads
+IMAGES_DIR=${APP_DIR}/images
 EOF
 
 mkdir -p uploads/payment-receipts
+mkdir -p images/rice
 chmod +x deploy/deploy.sh
 
 dc() {
@@ -133,6 +135,10 @@ mkdir -p "$APP_DIR/bin"
 echo "==> Build binary"
 go mod download
 go build -o "$APP_DIR/bin/lao-rice-api" ./cmd/server
+
+DEPLOY_USER="${SUDO_USER:-deploy}"
+if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_USER="deploy"; fi
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 
 DEPLOY_USER="${SUDO_USER:-deploy}"
 if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_USER="deploy"; fi

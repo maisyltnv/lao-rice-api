@@ -29,6 +29,7 @@ type createProductRequest struct {
 	ExchangeRate     float64  `json:"exchange_rate" binding:"required,gte=0"`
 	ProfitMargin     float64  `json:"profit_margin" binding:"required,gte=-1"`
 	FinalPriceLAK    *float64 `json:"final_price_lak"`
+	Stock            int      `json:"stock" binding:"gte=0"`
 	SourceURL        string   `json:"source_url"`
 }
 
@@ -47,6 +48,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		ExchangeRate:     req.ExchangeRate,
 		ProfitMargin:     req.ProfitMargin,
 		FinalPriceLAK:    req.FinalPriceLAK,
+		Stock:            req.Stock,
 		SourceURL:        req.SourceURL,
 	})
 	if err != nil {
@@ -108,6 +110,7 @@ type updateProductRequest struct {
 	ExchangeRate     *float64 `json:"exchange_rate"`
 	ProfitMargin     *float64 `json:"profit_margin"`
 	FinalPriceLAK    *float64 `json:"final_price_lak"`
+	Stock            *int     `json:"stock"`
 	SourceURL        *string  `json:"source_url"`
 }
 
@@ -132,6 +135,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		ExchangeRate:     req.ExchangeRate,
 		ProfitMargin:     req.ProfitMargin,
 		FinalPriceLAK:    req.FinalPriceLAK,
+		Stock:            req.Stock,
 		SourceURL:        req.SourceURL,
 	})
 	if err != nil {
