@@ -51,6 +51,7 @@ SHIPPING_FEE_LAK=30000
 FREE_SHIPPING_MIN_SUBTOTAL_LAK=500000
 UPLOAD_DIR=${APP_DIR}/uploads
 UPLOAD_URL_PREFIX=/uploads
+IMAGES_DIR=${APP_DIR}/images
 EOF
 elif [ -s "$ENV_BACKUP" ]; then
   cp "$ENV_BACKUP" "$APP_DIR/.env"
@@ -60,6 +61,7 @@ elif [ -f "$APP_DIR/.env.example" ]; then
 fi
 rm -f "$ENV_BACKUP"
 mkdir -p "$APP_DIR/uploads/payment-receipts"
+mkdir -p "$APP_DIR/images/rice"
 
 dc() {
   if docker compose version >/dev/null 2>&1; then
