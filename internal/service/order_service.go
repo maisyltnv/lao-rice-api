@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -179,6 +180,9 @@ func (s *OrderService) Place(ctx context.Context, in PlaceOrderInput) (*model.Or
 				return nil, errors.New("product not found")
 			}
 			return nil, err
+		}
+		if qty > p.Stock {
+			return nil, fmt.Errorf("insufficient stock for %s", p.Name)
 		}
 		unit := roundMoneyLAK(p.FinalPriceLAK)
 		lineTotal := roundMoneyLAK(unit * float64(qty))
