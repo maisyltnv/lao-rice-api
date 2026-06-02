@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"shopapi/internal/model"
@@ -22,6 +23,23 @@ func NewOrderRepository(db *gorm.DB) *OrderRepository {
 // OrderNumber is assigned after insert using the generated id (e.g. ORD-00000008).
 func (r *OrderRepository) CreateWithItems(ctx context.Context, o *model.Order, items []model.OrderItem) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Decrement stock atomically (prevents overselling under concurrency).
+		// If a product has insufficient stock, the transaction is rolled back.
+		for _, it := range items {
+			if it.Quantity <= 0 {
+				continue
+			}
+			res := tx.Model(&model.Product{}).
+				Where("id = ? AND stock >= ?", it.ProductID, it.Quantity).
+				UpdateColumn("stock", gorm.Expr("stock - ?", it.Quantity))
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return errors.New("insufficient stock")
+			}
+		}
+
 		if err := tx.Create(o).Error; err != nil {
 			return err
 		}
