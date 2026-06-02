@@ -57,6 +57,7 @@ type CreateProductInput struct {
 	ExchangeRate     float64
 	ProfitMargin     float64
 	FinalPriceLAK    *float64
+	Stock            int
 	SourceURL        string
 }
 
@@ -70,12 +71,16 @@ type UpdateProductInput struct {
 	ExchangeRate     *float64
 	ProfitMargin     *float64
 	FinalPriceLAK    *float64
+	Stock            *int
 	SourceURL        *string
 }
 
 func (s *ProductService) Create(ctx context.Context, in CreateProductInput) (*model.Product, error) {
 	if err := s.validateCategory(ctx, in.CategoryID); err != nil {
 		return nil, err
+	}
+	if in.Stock < 0 {
+		return nil, errors.New("stock must be >= 0")
 	}
 	if in.OriginalPriceCNY < 0 || in.ExchangeRate < 0 || in.ProfitMargin < -1 {
 		return nil, errors.New("invalid pricing inputs")
@@ -93,6 +98,7 @@ func (s *ProductService) Create(ctx context.Context, in CreateProductInput) (*mo
 		ExchangeRate:     in.ExchangeRate,
 		ProfitMargin:     in.ProfitMargin,
 		FinalPriceLAK:    final,
+		Stock:            in.Stock,
 		SourceURL:        in.SourceURL,
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -150,6 +156,12 @@ func (s *ProductService) Update(ctx context.Context, id uint64, in UpdateProduct
 	}
 	if in.ProfitMargin != nil {
 		p.ProfitMargin = *in.ProfitMargin
+	}
+	if in.Stock != nil {
+		if *in.Stock < 0 {
+			return nil, errors.New("stock must be >= 0")
+		}
+		p.Stock = *in.Stock
 	}
 	if in.SourceURL != nil {
 		p.SourceURL = *in.SourceURL
