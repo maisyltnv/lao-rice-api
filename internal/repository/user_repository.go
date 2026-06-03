@@ -35,3 +35,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uint64) (*model.User, e
 	}
 	return &u, nil
 }
+
+func (r *UserRepository) Save(ctx context.Context, u *model.User) error {
+	return r.db.WithContext(ctx).Save(u).Error
+}

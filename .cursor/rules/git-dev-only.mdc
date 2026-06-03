@@ -1,0 +1,26 @@
+---
+description: All code work on dev only; user merges to main for production
+alwaysApply: true
+---
+
+# Git workflow — dev only
+
+The owner controls **main** and production deploys. Agents must not bypass this.
+
+## Required
+
+- Do **all** code changes, commits, and branches from **`dev`** (or a feature branch off `dev` if the user asks).
+- Before editing, ensure the working tree is on `dev`: `git checkout dev` if needed.
+- When work is done, tell the user to review and merge **`dev` → `main`** themselves.
+
+## Forbidden (unless the user explicitly asks in the current message)
+
+- `git push origin main`
+- `git merge` into `main`, PRs to `main`, or any change that updates `origin/main`
+- `git push` to **any** remote without explicit user request
+- Assuming push/merge/deploy is OK
+
+## Production context
+
+- Push to **`main`** triggers GitHub Actions deploy to the VPS (production).
+- **`dev`** = development; **`main`** = production — only the user promotes `dev` to `main`.

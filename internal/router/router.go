@@ -55,7 +55,11 @@ func New(
 	{
 		authGroup.POST("/register", authH.Register)
 		authGroup.POST("/login", authH.Login)
+		authGroup.POST("/otp/send", authH.SendOTP)
+		authGroup.POST("/otp/verify", authH.VerifyOTP)
 		authGroup.GET("/me", middleware.JWTAuth(auth), authH.Me)
+		authGroup.PUT("/me/profile", middleware.JWTAuth(auth), authH.UpdateProfile)
+		authGroup.POST("/me/profile", middleware.JWTAuth(auth), authH.UpdateProfile)
 
 		authGroup.POST("/admin/register", authH.AdminRegister)
 		authGroup.POST("/admin/login", authH.AdminLogin)
@@ -76,12 +80,13 @@ func New(
 
 	r.GET("/orders/shipping-config", orderH.ShippingConfig)
 	r.GET("/orders/shipping-quote", orderH.QuoteShipping)
-	r.POST("/orders", orderH.Place)
 	r.GET("/ordersbyphone", orderH.ListByPhone)
 
 	protected := r.Group("")
 	protected.Use(middleware.JWTAuth(auth))
 	{
+		protected.POST("/orders", orderH.Place)
+		protected.GET("/orders/mine", orderH.ListMine)
 		protected.POST("/categories", categoryH.Create)
 		protected.PUT("/categories/:id", categoryH.Update)
 		protected.DELETE("/categories/:id", categoryH.Delete)
