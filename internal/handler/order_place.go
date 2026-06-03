@@ -50,6 +50,17 @@ func (h *OrderHandler) placeFromRequest(c *gin.Context, req placeOrderRequest, r
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	// Save shipping as default profile for next checkout (best effort).
+	if h.auth != nil {
+		_, _ = h.auth.UpdateCustomerProfile(c.Request.Context(), userID, service.UpdateProfileInput{
+			RecipientName:     req.Shipping.RecipientName,
+			ShippingPhone:     req.Shipping.Phone,
+			Province:          req.Shipping.Province,
+			AddressDetail:     req.Shipping.AddressDetail,
+			DeliveryLatitude:  req.Shipping.Latitude,
+			DeliveryLongitude: req.Shipping.Longitude,
+		})
+	}
 	c.JSON(http.StatusCreated, o)
 }
 

@@ -47,7 +47,7 @@ func main() {
 		log.Fatalf("uploads: %v", err)
 	}
 
-	orderH := handler.NewOrderHandler(orderSvc, receiptStore)
+	orderH := handler.NewOrderHandler(orderSvc, receiptStore, authSvc)
 	exchangeH := handler.NewExchangeRateHandler(exchangeSvc)
 	bannerH := handler.NewBannerHandler(bannerSvc)
 

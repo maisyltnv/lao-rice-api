@@ -129,15 +129,63 @@ func (h *AuthHandler) AdminLogin(c *gin.Context) {
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
-	uid, _ := c.Get(middleware.ContextUserIDKey)
-	name, _ := c.Get(middleware.ContextUsernameKey)
-	role, _ := c.Get(middleware.ContextRoleKey)
-	c.JSON(http.StatusOK, gin.H{
-		"id":       uid,
-		"username": name,
-		"phone":    name,
-		"role":     role,
+	uidVal, ok := c.Get(middleware.ContextUserIDKey)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid, ok := uidVal.(uint64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	u, err := h.auth.GetUserByID(c.Request.Context(), uid)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+	c.JSON(http.StatusOK, userJSON(u))
+}
+
+type updateProfileRequest struct {
+	RecipientName      string  `json:"recipient_name" binding:"required"`
+	ShippingPhone      string  `json:"shipping_phone"`
+	Province           string  `json:"province"`
+	AddressDetail      string  `json:"address_detail" binding:"required"`
+	DeliveryLatitude   float64 `json:"delivery_latitude"`
+	DeliveryLongitude  float64 `json:"delivery_longitude"`
+}
+
+// UpdateProfile saves the customer's default shipping info (prefills checkout).
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	uidVal, ok := c.Get(middleware.ContextUserIDKey)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid, ok := uidVal.(uint64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	var req updateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	u, err := h.auth.UpdateCustomerProfile(c.Request.Context(), uid, service.UpdateProfileInput{
+		RecipientName:     req.RecipientName,
+		ShippingPhone:     req.ShippingPhone,
+		Province:          req.Province,
+		AddressDetail:     req.AddressDetail,
+		DeliveryLatitude:  req.DeliveryLatitude,
+		DeliveryLongitude: req.DeliveryLongitude,
 	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, userJSON(u))
 }
 
 // AdminMe returns the current user only if the JWT is for an admin (for admin SPA).
@@ -209,11 +257,6 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": tok.Token,
 		"expires_at":   tok.ExpiresAt,
-		"user": gin.H{
-			"id":       u.ID,
-			"username": u.Username,
-			"phone":    u.Username,
-			"role":     u.Role,
-		},
+		"user":         userJSON(u),
 	})
 }

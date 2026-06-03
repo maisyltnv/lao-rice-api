@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
+	"shopapi/internal/delivery"
 	"shopapi/internal/model"
 	"shopapi/internal/repository"
 
@@ -202,4 +204,66 @@ func (s *AuthService) ParseToken(token string) (*jwtClaims, error) {
 		return nil, errors.New("invalid token")
 	}
 	return claims, nil
+}
+
+// GetUserByID loads a user row (including saved shipping profile).
+func (s *AuthService) GetUserByID(ctx context.Context, id uint64) (*model.User, error) {
+	return s.users.GetByID(ctx, id)
+}
+
+// UpdateProfileInput is the customer default shipping address for checkout.
+type UpdateProfileInput struct {
+	RecipientName     string
+	ShippingPhone     string
+	Province          string
+	AddressDetail     string
+	DeliveryLatitude  float64
+	DeliveryLongitude float64
+}
+
+// UpdateCustomerProfile saves default shipping fields on the user account.
+func (s *AuthService) UpdateCustomerProfile(ctx context.Context, userID uint64, in UpdateProfileInput) (*model.User, error) {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if u.Role != model.RoleUser {
+		return nil, errors.New("only customer accounts have a shipping profile")
+	}
+	name := strings.TrimSpace(in.RecipientName)
+	if name == "" {
+		return nil, errors.New("recipient_name is required")
+	}
+	phone := strings.TrimSpace(in.ShippingPhone)
+	if phone == "" {
+		phone = u.Username
+	}
+	phone = NormalizePhone(phone)
+	if len(phone) < 8 {
+		return nil, ErrInvalidPhone
+	}
+	addr := strings.TrimSpace(in.AddressDetail)
+	if addr == "" {
+		return nil, errors.New("address_detail is required")
+	}
+	province := strings.TrimSpace(in.Province)
+	if province == "" {
+		province = "ນະຄອນຫຼວງວຽງຈັນ"
+	}
+	lat, lng := in.DeliveryLatitude, in.DeliveryLongitude
+	if lat != 0 || lng != 0 {
+		if err := delivery.ValidateCoordinates(lat, lng); err != nil {
+			return nil, err
+		}
+	}
+	u.RecipientName = name
+	u.ShippingPhone = phone
+	u.Province = province
+	u.AddressDetail = addr
+	u.DeliveryLatitude = lat
+	u.DeliveryLongitude = lng
+	if err := s.users.Save(ctx, u); err != nil {
+		return nil, err
+	}
+	return u, nil
 }

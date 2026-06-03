@@ -19,10 +19,15 @@ import (
 type OrderHandler struct {
 	orders   *service.OrderService
 	receipts *upload.PaymentReceiptStore
+	auth     *service.AuthService
 }
 
-func NewOrderHandler(orders *service.OrderService, receipts *upload.PaymentReceiptStore) *OrderHandler {
-	return &OrderHandler{orders: orders, receipts: receipts}
+func NewOrderHandler(
+	orders *service.OrderService,
+	receipts *upload.PaymentReceiptStore,
+	auth *service.AuthService,
+) *OrderHandler {
+	return &OrderHandler{orders: orders, receipts: receipts, auth: auth}
 }
 
 type orderLineRequest struct {

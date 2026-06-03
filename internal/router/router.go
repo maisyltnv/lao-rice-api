@@ -58,6 +58,8 @@ func New(
 		authGroup.POST("/otp/send", authH.SendOTP)
 		authGroup.POST("/otp/verify", authH.VerifyOTP)
 		authGroup.GET("/me", middleware.JWTAuth(auth), authH.Me)
+		authGroup.PUT("/me/profile", middleware.JWTAuth(auth), authH.UpdateProfile)
+		authGroup.POST("/me/profile", middleware.JWTAuth(auth), authH.UpdateProfile)
 
 		authGroup.POST("/admin/register", authH.AdminRegister)
 		authGroup.POST("/admin/login", authH.AdminLogin)
