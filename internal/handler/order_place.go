@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"shopapi/internal/middleware"
 	"shopapi/internal/model"
 	"shopapi/internal/service"
 
@@ -12,6 +13,17 @@ import (
 )
 
 func (h *OrderHandler) placeFromRequest(c *gin.Context, req placeOrderRequest, receiptURL string) {
+	uidVal, ok := c.Get(middleware.ContextUserIDKey)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "login required"})
+		return
+	}
+	userID, ok := uidVal.(uint64)
+	if !ok || userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "login required"})
+		return
+	}
+
 	lines := make([]service.OrderLineInput, 0, len(req.Items))
 	for _, it := range req.Items {
 		lines = append(lines, service.OrderLineInput{ProductID: it.ProductID, Quantity: it.Quantity})
@@ -21,7 +33,7 @@ func (h *OrderHandler) placeFromRequest(c *gin.Context, req placeOrderRequest, r
 		receipt = strings.TrimSpace(req.PaymentReceiptURL)
 	}
 	o, err := h.orders.Place(c.Request.Context(), service.PlaceOrderInput{
-		UserID: 0,
+		UserID: userID,
 		Lines:  lines,
 		Shipping: service.ShippingInput{
 			RecipientName: req.Shipping.RecipientName,

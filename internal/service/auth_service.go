@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -141,6 +143,48 @@ func (s *AuthService) signJWT(userID uint64, username, role string, exp time.Tim
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return t.SignedString(s.secret)
+}
+
+// FindOrCreatePhoneUser returns a customer account keyed by normalized phone (stored as username).
+func (s *AuthService) FindOrCreatePhoneUser(ctx context.Context, phone string) (*model.User, error) {
+	p := NormalizePhone(phone)
+	if len(p) < 8 {
+		return nil, ErrInvalidPhone
+	}
+	u, err := s.users.GetByUsername(ctx, p)
+	if err == nil {
+		return u, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	secret := make([]byte, 16)
+	if _, err := rand.Read(secret); err != nil {
+		return nil, err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(hex.EncodeToString(secret)), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	u = &model.User{
+		Username:     p,
+		PasswordHash: string(hash),
+		Role:         model.RoleUser,
+	}
+	if err := s.users.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// IssueTokenForUser signs a JWT for an existing user.
+func (s *AuthService) IssueTokenForUser(u *model.User) (*TokenPair, error) {
+	exp := time.Now().Add(time.Duration(s.expiryH) * time.Hour)
+	tok, err := s.signJWT(u.ID, u.Username, u.Role, exp)
+	if err != nil {
+		return nil, err
+	}
+	return &TokenPair{Token: tok, ExpiresAt: exp}, nil
 }
 
 func (s *AuthService) ParseToken(token string) (*jwtClaims, error) {

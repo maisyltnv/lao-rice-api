@@ -16,6 +16,8 @@ type Config struct {
 	UploadDir                  string
 	UploadURLPrefix            string
 	ImagesDir                  string
+	OTPStubCode                string
+	OTPExpiryMinutes           int
 }
 
 // Load reads configuration from environment variables with sensible defaults for local dev.
@@ -36,7 +38,21 @@ func Load() Config {
 		UploadDir:                  getenv("UPLOAD_DIR", "uploads"),
 		UploadURLPrefix:            getenv("UPLOAD_URL_PREFIX", "/uploads"),
 		ImagesDir:                  getenv("IMAGES_DIR", "images"),
+		OTPStubCode:                getenv("OTP_STUB_CODE", "1234"),
+		OTPExpiryMinutes:           getenvInt("OTP_EXPIRY_MINUTES", 10),
 	}
+}
+
+func getenvInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }
 
 func getenvFloat(key string, fallback float64) float64 {

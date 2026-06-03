@@ -32,13 +32,14 @@ func main() {
 	bannerRepo := repository.NewBannerRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryH)
+	otpSvc := service.NewOTPService(cfg.OTPStubCode, cfg.OTPExpiryMinutes)
 	categorySvc := service.NewCategoryService(categoryRepo, productRepo)
 	productSvc := service.NewProductService(productRepo, categoryRepo)
 	orderSvc := service.NewOrderService(orderRepo, productRepo, cfg.ShippingFeeLAK, cfg.FreeShippingMinSubtotalLAK)
 	exchangeSvc := service.NewExchangeRateService(exchangeRepo, productRepo)
 	bannerSvc := service.NewBannerService(bannerRepo)
 
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc, otpSvc)
 	categoryH := handler.NewCategoryHandler(categorySvc)
 	productH := handler.NewProductHandler(productSvc)
 	receiptStore, err := upload.NewPaymentReceiptStore(cfg.UploadDir, cfg.UploadURLPrefix)
