@@ -100,6 +100,28 @@ func (h *OrderHandler) Place(c *gin.Context) {
 	h.placeFromRequest(c, req, "")
 }
 
+// ListMine returns paginated orders for the authenticated customer (JWT user_id).
+func (h *OrderHandler) ListMine(c *gin.Context) {
+	uidVal, ok := c.Get(middleware.ContextUserIDKey)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid, ok := uidVal.(uint64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	res, err := h.orders.ListMinePaginated(c.Request.Context(), uid, page, limit)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // List returns all orders (admin only).
 func (h *OrderHandler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))

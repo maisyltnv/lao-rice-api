@@ -84,6 +84,7 @@ func New(
 	protected.Use(middleware.JWTAuth(auth))
 	{
 		protected.POST("/orders", orderH.Place)
+		protected.GET("/orders/mine", orderH.ListMine)
 		protected.POST("/categories", categoryH.Create)
 		protected.PUT("/categories/:id", categoryH.Update)
 		protected.DELETE("/categories/:id", categoryH.Delete)

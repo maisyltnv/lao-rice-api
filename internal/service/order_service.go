@@ -320,6 +320,37 @@ func (s *OrderService) ListMine(ctx context.Context, userID uint64, limit, offse
 	return s.orders.ListByUserID(ctx, userID, limit, offset)
 }
 
+// ListMinePaginated returns orders for the authenticated customer (newest first).
+func (s *OrderService) ListMinePaginated(ctx context.Context, userID uint64, page, limit int) (*OrderPageResult, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	offset := (page - 1) * limit
+	items, total, err := s.ListMine(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = int((total + int64(limit) - 1) / int64(limit))
+	}
+	return &OrderPageResult{
+		Items:      items,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1 && totalPages > 0,
+	}, nil
+}
+
 // ListAll returns paginated orders for every customer (admin).
 func (s *OrderService) ListAll(ctx context.Context, limit, offset int) ([]model.Order, int64, error) {
 	limit, offset = normalizeOrderPagination(limit, offset)
