@@ -7,17 +7,48 @@ import (
 	"strings"
 
 	"shopapi/internal/service"
+	"shopapi/internal/upload"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type ProductHandler struct {
-	svc *service.ProductService
+	svc    *service.ProductService
+	images *upload.ProductImageStore
 }
 
-func NewProductHandler(svc *service.ProductService) *ProductHandler {
-	return &ProductHandler{svc: svc}
+func NewProductHandler(svc *service.ProductService, images *upload.ProductImageStore) *ProductHandler {
+	return &ProductHandler{svc: svc, images: images}
+}
+
+func (h *ProductHandler) maybeDeleteManagedImage(oldURL string) {
+	if h.images == nil || oldURL == "" {
+		return
+	}
+	if !h.images.IsManagedURL(oldURL) {
+		return
+	}
+	_ = h.images.DeleteByURL(oldURL)
+}
+
+// UploadImage accepts multipart field "image" and returns a public path for image_url.
+func (h *ProductHandler) UploadImage(c *gin.Context) {
+	if h.images == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload store not configured"})
+		return
+	}
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image file is required"})
+		return
+	}
+	url, err := h.images.Save(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
 type createProductRequest struct {
@@ -125,6 +156,16 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	existing, err := h.svc.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	p, err := h.svc.Update(c.Request.Context(), id, service.UpdateProductInput{
 		Name:             req.Name,
 		Description:      req.Description,
@@ -146,6 +187,13 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.ImageURL != nil {
+		newURL := strings.TrimSpace(*req.ImageURL)
+		oldURL := strings.TrimSpace(existing.ImageURL)
+		if newURL != "" && newURL != oldURL {
+			h.maybeDeleteManagedImage(oldURL)
+		}
+	}
 	c.JSON(http.StatusOK, p)
 }
 
@@ -155,9 +203,13 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
+	existing, getErr := h.svc.GetByID(c.Request.Context(), id)
 	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if getErr == nil {
+		h.maybeDeleteManagedImage(existing.ImageURL)
 	}
 	c.Status(http.StatusNoContent)
 }

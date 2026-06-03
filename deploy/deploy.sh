@@ -61,6 +61,7 @@ elif [ -f "$APP_DIR/.env.example" ]; then
 fi
 rm -f "$ENV_BACKUP"
 mkdir -p "$APP_DIR/uploads/payment-receipts"
+mkdir -p "$APP_DIR/uploads/product-images"
 mkdir -p "$APP_DIR/images/rice"
 
 dc() {

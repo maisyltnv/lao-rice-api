@@ -92,6 +92,7 @@ func New(
 		protected.DELETE("/categories/:id", categoryH.Delete)
 
 		protected.POST("/products", productH.Create)
+		protected.POST("/products/upload-image", productH.UploadImage)
 		protected.PUT("/products/:id", productH.Update)
 		protected.DELETE("/products/:id", productH.Delete)
 

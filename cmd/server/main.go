@@ -41,11 +41,15 @@ func main() {
 
 	authH := handler.NewAuthHandler(authSvc, otpSvc)
 	categoryH := handler.NewCategoryHandler(categorySvc)
-	productH := handler.NewProductHandler(productSvc)
 	receiptStore, err := upload.NewPaymentReceiptStore(cfg.UploadDir, cfg.UploadURLPrefix)
 	if err != nil {
 		log.Fatalf("uploads: %v", err)
 	}
+	productImageStore, err := upload.NewProductImageStore(cfg.UploadDir, cfg.UploadURLPrefix)
+	if err != nil {
+		log.Fatalf("product uploads: %v", err)
+	}
+	productH := handler.NewProductHandler(productSvc, productImageStore)
 
 	orderH := handler.NewOrderHandler(orderSvc, receiptStore, authSvc)
 	exchangeH := handler.NewExchangeRateHandler(exchangeSvc)
