@@ -86,6 +86,7 @@ IMAGES_DIR=${APP_DIR}/images
 EOF
 
 mkdir -p uploads/payment-receipts
+mkdir -p uploads/product-images
 mkdir -p images/rice
 chmod +x deploy/deploy.sh
 
