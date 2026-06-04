@@ -3,21 +3,53 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"shopapi/internal/middleware"
 	"shopapi/internal/model"
 	"shopapi/internal/service"
+	"shopapi/internal/upload"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type BannerHandler struct {
-	svc *service.BannerService
+	svc    *service.BannerService
+	images *upload.BannerImageStore
 }
 
-func NewBannerHandler(svc *service.BannerService) *BannerHandler {
-	return &BannerHandler{svc: svc}
+func NewBannerHandler(svc *service.BannerService, images *upload.BannerImageStore) *BannerHandler {
+	return &BannerHandler{svc: svc, images: images}
+}
+
+func (h *BannerHandler) maybeDeleteManagedImage(oldURL string) {
+	if h.images == nil || oldURL == "" {
+		return
+	}
+	if !h.images.IsManagedURL(oldURL) {
+		return
+	}
+	_ = h.images.DeleteByURL(oldURL)
+}
+
+// UploadImage accepts multipart field "image" and returns a public path for image_url.
+func (h *BannerHandler) UploadImage(c *gin.Context) {
+	if h.images == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload store not configured"})
+		return
+	}
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image file is required"})
+		return
+	}
+	url, err := h.images.Save(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"image_url": url})
 }
 
 // List returns active banners for the storefront, or all banners for admin (?include_inactive=true).
@@ -128,6 +160,15 @@ func (h *BannerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	existing, err := h.svc.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	b, err := h.svc.Update(c.Request.Context(), id, service.UpdateBannerInput{
 		Title:       req.Title,
 		Subtitle:    req.Subtitle,
@@ -146,6 +187,13 @@ func (h *BannerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.ImageURL != nil {
+		newURL := strings.TrimSpace(*req.ImageURL)
+		oldURL := strings.TrimSpace(existing.ImageURL)
+		if newURL != "" && newURL != oldURL {
+			h.maybeDeleteManagedImage(oldURL)
+		}
+	}
 	c.JSON(http.StatusOK, b)
 }
 
@@ -155,6 +203,7 @@ func (h *BannerHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
+	existing, getErr := h.svc.GetByID(c.Request.Context(), id)
 	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -162,6 +211,9 @@ func (h *BannerHandler) Delete(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if getErr == nil {
+		h.maybeDeleteManagedImage(existing.ImageURL)
 	}
 	c.Status(http.StatusNoContent)
 }

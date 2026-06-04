@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY --from=builder /server ./server
 
-RUN mkdir -p /app/uploads/payment-receipts /app/uploads/product-images && chmod -R 777 /app/uploads
+RUN mkdir -p /app/uploads/payment-receipts /app/uploads/product-images /app/uploads/banner-images && chmod -R 777 /app/uploads
 
 ENV PORT=8080
 ENV UPLOAD_DIR=/app/uploads

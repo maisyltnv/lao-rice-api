@@ -103,6 +103,7 @@ func New(
 
 		protected.PUT("/exchange-rate", middleware.RequireAdmin(), exchangeH.Set)
 
+		protected.POST("/banners/upload-image", middleware.RequireAdmin(), bannerH.UploadImage)
 		protected.POST("/banners", middleware.RequireAdmin(), bannerH.Create)
 		protected.PUT("/banners/:id", middleware.RequireAdmin(), bannerH.Update)
 		protected.DELETE("/banners/:id", middleware.RequireAdmin(), bannerH.Delete)
