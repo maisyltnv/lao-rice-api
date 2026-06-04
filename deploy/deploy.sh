@@ -88,6 +88,13 @@ echo "==> Build API"
 /usr/local/go/bin/go mod download
 /usr/local/go/bin/go build -o "$BIN" ./cmd/server
 
+echo "==> Ensure default admin (seed)"
+set -a
+# shellcheck disable=SC1091
+[ -f "$APP_DIR/.env" ] && source "$APP_DIR/.env"
+set +a
+/usr/local/go/bin/go run ./cmd/seed -admin-only
+
 echo "==> Install systemd unit (if ExecStart path changed)"
 sudo -n cp deploy/lao-rice-api.service /etc/systemd/system/lao-rice-api.service
 vps_sudo_systemctl daemon-reload

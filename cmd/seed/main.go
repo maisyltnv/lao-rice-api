@@ -1,8 +1,9 @@
-// Seed sample rice categories and products for Lao Rice Shop (idempotent by slug / name).
+// Seed sample rice categories, products, and default admin (idempotent).
 package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -12,11 +13,15 @@ import (
 	"shopapi/internal/model"
 	"shopapi/internal/repository"
 	"shopapi/internal/service"
+	"shopapi/seed"
 
 	"gorm.io/gorm"
 )
 
 func main() {
+	adminOnly := flag.Bool("admin-only", false, "only ensure default admin user")
+	flag.Parse()
+
 	cfg := config.Load()
 	if v := os.Getenv("DATABASE_URL"); v != "" {
 		cfg.DatabaseURL = v
@@ -28,6 +33,13 @@ func main() {
 	}
 
 	ctx := context.Background()
+	if err := seed.EnsureDefaultAdmin(ctx, db); err != nil {
+		log.Fatalf("admin seed: %v", err)
+	}
+	if *adminOnly {
+		log.Println("admin seed completed")
+		return
+	}
 	categoryRepo := repository.NewCategoryRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	categorySvc := service.NewCategoryService(categoryRepo, productRepo)
@@ -76,7 +88,7 @@ func main() {
 		log.Printf("product: %s — %s LAK", p.name, fmt.Sprintf("%.0f", p.priceLak))
 	}
 
-	log.Println("seed completed")
+	log.Println("seed completed (products + admin)")
 }
 
 func ensureCategory(ctx context.Context, db *gorm.DB, svc *service.CategoryService, slug, name, desc string, sort int) (uint64, error) {

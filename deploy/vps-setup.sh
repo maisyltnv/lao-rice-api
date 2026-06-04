@@ -130,6 +130,12 @@ if ! dc exec -T -e PGPASSWORD="$DB_PASSWORD" db psql -U postgres -d lao_rice -tA
   source "$APP_DIR/.env"
   set +a
   go run ./cmd/seed
+else
+  set -a
+  # shellcheck disable=SC1091
+  source "$APP_DIR/.env"
+  set +a
+  go run ./cmd/seed -admin-only
 fi
 
 mkdir -p "$APP_DIR/bin"
@@ -165,7 +171,7 @@ echo "Setup complete."
 echo "API: http://${PUBLIC_IP}:${API_PORT}"
 echo "Health: http://${PUBLIC_IP}:${API_PORT}/health"
 echo ""
-echo "Create admin (once):"
-echo "  curl -X POST http://127.0.0.1:${API_PORT}/auth/admin/register \\"
-echo "    -H 'Content-Type: application/json' \\"
-echo "    -d '{\"username\":\"admin\",\"password\":\"YOUR_STRONG_PASSWORD\"}'"
+echo "Default admin (from seed/defaults.go):"
+echo "  username: admin"
+echo "  password: 1234"
+echo "  Re-apply: cd $APP_DIR && source .env && go run ./cmd/seed -admin-only"
