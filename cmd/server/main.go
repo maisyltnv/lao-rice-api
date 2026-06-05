@@ -30,12 +30,14 @@ func main() {
 	orderRepo := repository.NewOrderRepository(db)
 	exchangeRepo := repository.NewExchangeRateRepository(db)
 	bannerRepo := repository.NewBannerRepository(db)
+	shopSettingsRepo := repository.NewShopSettingsRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryH)
 	otpSvc := service.NewOTPService(cfg.OTPStubCode, cfg.OTPExpiryMinutes)
 	categorySvc := service.NewCategoryService(categoryRepo, productRepo)
 	productSvc := service.NewProductService(productRepo, categoryRepo)
-	orderSvc := service.NewOrderService(orderRepo, productRepo, cfg.ShippingFeeLAK, cfg.FreeShippingMinSubtotalLAK)
+	orderSvc := service.NewOrderService(orderRepo, productRepo, shopSettingsRepo, cfg.ShippingFeeLAK, cfg.FreeShippingMinSubtotalLAK)
+	shopSettingsSvc := service.NewShopSettingsService(shopSettingsRepo, cfg.ShippingFeeLAK, cfg.FreeShippingMinSubtotalLAK)
 	exchangeSvc := service.NewExchangeRateService(exchangeRepo, productRepo)
 	bannerSvc := service.NewBannerService(bannerRepo)
 
@@ -56,10 +58,11 @@ func main() {
 	productH := handler.NewProductHandler(productSvc, productImageStore)
 
 	orderH := handler.NewOrderHandler(orderSvc, receiptStore, authSvc)
+	shopSettingsH := handler.NewShopSettingsHandler(shopSettingsSvc)
 	exchangeH := handler.NewExchangeRateHandler(exchangeSvc)
 	bannerH := handler.NewBannerHandler(bannerSvc, bannerImageStore)
 
-	r := router.New(authSvc, authH, categoryH, productH, orderH, exchangeH, bannerH, cfg.UploadDir, cfg.ImagesDir)
+	r := router.New(authSvc, authH, categoryH, productH, orderH, shopSettingsH, exchangeH, bannerH, cfg.UploadDir, cfg.ImagesDir)
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{

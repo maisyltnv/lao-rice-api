@@ -19,23 +19,34 @@ const maxOrderQty = 9999
 
 // OrderService handles checkout: orders are built from product lines with server-side pricing.
 type OrderService struct {
-	orders                   *repository.OrderRepository
-	products                 *repository.ProductRepository
-	shippingFeeLAK           float64
-	freeShippingMinSubtotal  float64
+	orders       *repository.OrderRepository
+	products     *repository.ProductRepository
+	shopSettings *repository.ShopSettingsRepository
+	defaultFee   float64
+	defaultMin   float64
 }
 
 func NewOrderService(
 	orders *repository.OrderRepository,
 	products *repository.ProductRepository,
-	shippingFeeLAK, freeShippingMinSubtotal float64,
+	shopSettings *repository.ShopSettingsRepository,
+	defaultFee, defaultMin float64,
 ) *OrderService {
 	return &OrderService{
-		orders:                  orders,
-		products:                products,
-		shippingFeeLAK:          shippingFeeLAK,
-		freeShippingMinSubtotal: freeShippingMinSubtotal,
+		orders:       orders,
+		products:     products,
+		shopSettings: shopSettings,
+		defaultFee:   defaultFee,
+		defaultMin:   defaultMin,
 	}
+}
+
+func (s *OrderService) shippingRules(ctx context.Context) (fee float64, freeMin float64, err error) {
+	cfg, err := s.shopSettings.GetOrCreate(ctx, s.defaultFee, s.defaultMin)
+	if err != nil {
+		return s.defaultFee, s.defaultMin, err
+	}
+	return cfg.ShippingFeeLAK, cfg.FreeShippingMinSubtotalLAK, nil
 }
 
 type OrderLineInput struct {
@@ -61,16 +72,24 @@ type PlaceOrderInput struct {
 }
 
 type ShippingConfigView struct {
-	ShippingFeeLAK            float64 `json:"shipping_fee_lak"`
+	ShippingFeeLAK             float64 `json:"shipping_fee_lak"`
 	FreeShippingMinSubtotalLAK float64 `json:"free_shipping_min_subtotal_lak"`
+	BcelQrEnabled              bool    `json:"bcel_qr_enabled"`
+	CodEnabled                 bool    `json:"cod_enabled"`
 }
 
 // ShippingConfig returns shop shipping rules for the checkout UI.
-func (s *OrderService) ShippingConfig() ShippingConfigView {
-	return ShippingConfigView{
-		ShippingFeeLAK:            s.shippingFeeLAK,
-		FreeShippingMinSubtotalLAK: s.freeShippingMinSubtotal,
+func (s *OrderService) ShippingConfig(ctx context.Context) (ShippingConfigView, error) {
+	cfg, err := s.shopSettings.GetOrCreate(ctx, s.defaultFee, s.defaultMin)
+	if err != nil {
+		return ShippingConfigView{}, err
 	}
+	return ShippingConfigView{
+		ShippingFeeLAK:             cfg.ShippingFeeLAK,
+		FreeShippingMinSubtotalLAK: cfg.FreeShippingMinSubtotalLAK,
+		BcelQrEnabled:              cfg.BcelQrEnabled,
+		CodEnabled:                 cfg.CodEnabled,
+	}, nil
 }
 
 type ShippingQuoteInput struct {
@@ -87,38 +106,55 @@ type ShippingQuoteView struct {
 }
 
 // QuoteShipping estimates fees for a cart subtotal (matches checkout summary sidebar).
-func (s *OrderService) QuoteShipping(subtotalLAK float64) ShippingQuoteView {
+func (s *OrderService) QuoteShipping(ctx context.Context, subtotalLAK float64) (ShippingQuoteView, error) {
 	subtotal := roundMoneyLAK(subtotalLAK)
-	fee := s.calcShippingFee(subtotal)
-	total := roundMoneyLAK(subtotal + fee)
+	fee, freeMin, err := s.shippingRules(ctx)
+	if err != nil {
+		return ShippingQuoteView{}, err
+	}
+	shippingFee := s.calcShippingFee(subtotal, fee, freeMin)
+	total := roundMoneyLAK(subtotal + shippingFee)
 	untilFree := 0.0
-	if subtotal < s.freeShippingMinSubtotal {
-		untilFree = roundMoneyLAK(s.freeShippingMinSubtotal - subtotal)
+	if subtotal < freeMin {
+		untilFree = roundMoneyLAK(freeMin - subtotal)
 	}
 	return ShippingQuoteView{
 		SubtotalLAK:                subtotal,
-		ShippingFeeLAK:             fee,
+		ShippingFeeLAK:             shippingFee,
 		TotalAmountLAK:             total,
-		FreeShippingMinSubtotalLAK: s.freeShippingMinSubtotal,
+		FreeShippingMinSubtotalLAK: freeMin,
 		AmountUntilFreeShippingLAK: untilFree,
-		FreeShippingApplied:        fee == 0 && subtotal > 0,
-	}
+		FreeShippingApplied:        shippingFee == 0 && subtotal > 0,
+	}, nil
 }
 
-func (s *OrderService) calcShippingFee(subtotalLAK float64) float64 {
-	if subtotalLAK >= s.freeShippingMinSubtotal {
+func (s *OrderService) calcShippingFee(subtotalLAK, feeLAK, freeMin float64) float64 {
+	if subtotalLAK >= freeMin {
 		return 0
 	}
-	return roundMoneyLAK(s.shippingFeeLAK)
+	return roundMoneyLAK(feeLAK)
 }
 
 func roundMoneyLAK(x float64) float64 {
 	return math.Round(x*100) / 100
 }
 
-func (s *OrderService) validatePaymentMethod(method string) error {
-	switch strings.ToLower(strings.TrimSpace(method)) {
-	case model.PaymentMethodBCELQR, model.PaymentMethodCOD:
+func (s *OrderService) validatePaymentMethod(ctx context.Context, method string) error {
+	m := strings.ToLower(strings.TrimSpace(method))
+	cfg, err := s.shopSettings.GetOrCreate(ctx, s.defaultFee, s.defaultMin)
+	if err != nil {
+		return err
+	}
+	switch m {
+	case model.PaymentMethodBCELQR:
+		if !cfg.BcelQrEnabled {
+			return errors.New("bcel_qr payment is disabled")
+		}
+		return nil
+	case model.PaymentMethodCOD:
+		if !cfg.CodEnabled {
+			return errors.New("cod payment is disabled")
+		}
 		return nil
 	default:
 		return errors.New("payment_method must be bcel_qr or cod")
@@ -130,7 +166,7 @@ func (s *OrderService) Place(ctx context.Context, in PlaceOrderInput) (*model.Or
 	if len(in.Lines) == 0 {
 		return nil, errors.New("order must have at least one line item")
 	}
-	if err := s.validatePaymentMethod(in.PaymentMethod); err != nil {
+	if err := s.validatePaymentMethod(ctx, in.PaymentMethod); err != nil {
 		return nil, err
 	}
 	if strings.EqualFold(strings.TrimSpace(in.PaymentMethod), model.PaymentMethodBCELQR) &&
@@ -196,7 +232,11 @@ func (s *OrderService) Place(ctx context.Context, in PlaceOrderInput) (*model.Or
 		subtotal += lineTotal
 	}
 	subtotal = roundMoneyLAK(subtotal)
-	shippingFee := s.calcShippingFee(subtotal)
+	fee, freeMin, err := s.shippingRules(ctx)
+	if err != nil {
+		return nil, err
+	}
+	shippingFee := s.calcShippingFee(subtotal, fee, freeMin)
 	total := roundMoneyLAK(subtotal + shippingFee)
 
 	o := &model.Order{
