@@ -12,8 +12,27 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+const dbConnectRetries = 30
+
 // New opens a PostgreSQL connection with GORM, runs migrations, and returns the DB handle.
 func New(dsn string) (*gorm.DB, error) {
+	var db *gorm.DB
+	var err error
+	for attempt := 1; attempt <= dbConnectRetries; attempt++ {
+		db, err = open(dsn)
+		if err == nil {
+			log.Println("database connected and migrations applied")
+			return db, nil
+		}
+		if attempt < dbConnectRetries {
+			log.Printf("database connect attempt %d/%d failed: %v", attempt, dbConnectRetries, err)
+			time.Sleep(time.Second)
+		}
+	}
+	return nil, fmt.Errorf("database after %d attempts: %w", dbConnectRetries, err)
+}
+
+func open(dsn string) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
@@ -28,6 +47,7 @@ func New(dsn string) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 
 	if err := db.AutoMigrate(
 		&model.User{},
@@ -58,6 +78,5 @@ func New(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("migrate order status: %w", err)
 	}
 
-	log.Println("database connected and migrations applied")
 	return db, nil
 }

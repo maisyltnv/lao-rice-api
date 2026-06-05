@@ -88,7 +88,7 @@ EOF
 mkdir -p uploads/payment-receipts
 mkdir -p uploads/product-images
 mkdir -p images/rice
-chmod +x deploy/deploy.sh
+chmod +x deploy/deploy.sh deploy/wait-for-db.sh
 
 dc() {
   if docker compose version >/dev/null 2>&1; then
