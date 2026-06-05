@@ -14,6 +14,7 @@ import (
 func New(
 	auth *service.AuthService,
 	authH *handler.AuthHandler,
+	healthH *handler.HealthHandler,
 	categoryH *handler.CategoryHandler,
 	productH *handler.ProductHandler,
 	orderH *handler.OrderHandler,
@@ -41,9 +42,7 @@ func New(
 		c.Next()
 	})
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
+	r.GET("/health", healthH.Check)
 
 	if uploadDir != "" {
 		r.Static("/uploads", uploadDir)

@@ -61,8 +61,9 @@ func main() {
 	shopSettingsH := handler.NewShopSettingsHandler(shopSettingsSvc)
 	exchangeH := handler.NewExchangeRateHandler(exchangeSvc)
 	bannerH := handler.NewBannerHandler(bannerSvc, bannerImageStore)
+	healthH := handler.NewHealthHandler(db)
 
-	r := router.New(authSvc, authH, categoryH, productH, orderH, shopSettingsH, exchangeH, bannerH, cfg.UploadDir, cfg.ImagesDir)
+	r := router.New(authSvc, authH, healthH, categoryH, productH, orderH, shopSettingsH, exchangeH, bannerH, cfg.UploadDir, cfg.ImagesDir)
 
 	addr := ":" + cfg.Port
 	srv := &http.Server{
