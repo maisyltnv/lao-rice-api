@@ -11,7 +11,6 @@ BIN="$APP_DIR/bin/lao-rice-api"
 GITHUB_KEY="${GITHUB_KEY:-$HOME/.ssh/github_lao_rice}"
 
 cd "$APP_DIR"
-chmod +x deploy/deploy.sh deploy/wait-for-db.sh 2>/dev/null || true
 mkdir -p "$APP_DIR/bin"
 
 if [ -f "$GITHUB_KEY" ]; then
@@ -30,6 +29,8 @@ _cksum_before=""
 echo "==> Pull latest main"
 git fetch origin main
 git reset --hard origin/main
+
+chmod +x deploy/deploy.sh deploy/wait-for-db.sh 2>/dev/null || true
 
 _cksum_after="$(cksum "$DEPLOY_SCRIPT" | awk '{print $1}')"
 if [ -n "$_cksum_before" ] && [ "$_cksum_before" != "$_cksum_after" ] && [ -z "${DEPLOY_REEXEC:-}" ]; then
