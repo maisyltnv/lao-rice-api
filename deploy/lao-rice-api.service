@@ -7,7 +7,6 @@ Requires=docker.service
 Type=simple
 WorkingDirectory=/opt/lao-rice-api
 EnvironmentFile=/opt/lao-rice-api/.env
-ExecStartPre=/opt/lao-rice-api/deploy/wait-for-db.sh
 ExecStart=/opt/lao-rice-api/bin/lao-rice-api
 Restart=always
 RestartSec=5

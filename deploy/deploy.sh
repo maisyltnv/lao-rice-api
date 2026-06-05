@@ -1,13 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/vps-common.sh
+source "$SCRIPT_DIR/lib/vps-common.sh"
+
 APP_DIR="/opt/lao-rice-api"
 SERVICE="lao-rice-api"
 BIN="$APP_DIR/bin/lao-rice-api"
 GITHUB_KEY="${GITHUB_KEY:-$HOME/.ssh/github_lao_rice}"
 
 cd "$APP_DIR"
-chmod +x deploy/deploy.sh deploy/wait-for-db.sh 2>/dev/null || true
 mkdir -p "$APP_DIR/bin"
 
 if [ -f "$GITHUB_KEY" ]; then
@@ -26,6 +29,8 @@ _cksum_before=""
 echo "==> Pull latest main"
 git fetch origin main
 git reset --hard origin/main
+
+chmod +x deploy/deploy.sh deploy/wait-for-db.sh 2>/dev/null || true
 
 _cksum_after="$(cksum "$DEPLOY_SCRIPT" | awk '{print $1}')"
 if [ -n "$_cksum_before" ] && [ "$_cksum_before" != "$_cksum_after" ] && [ -z "${DEPLOY_REEXEC:-}" ]; then
@@ -64,24 +69,17 @@ mkdir -p "$APP_DIR/uploads/payment-receipts"
 mkdir -p "$APP_DIR/uploads/product-images"
 mkdir -p "$APP_DIR/images/rice"
 
-dc() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose "$@"
-  else
-    docker-compose "$@"
-  fi
-}
-
 echo "==> Start PostgreSQL"
-if ! dc up -d db; then
-  echo "Retrying after Docker restart..."
-  sudo -n systemctl restart docker || true
+vps_ensure_docker
+if ! vps_dc up -d db; then
+  vps_sudo_systemctl restart docker || true
   sleep 8
-  dc up -d db
+  vps_ensure_docker
+  vps_dc up -d db
 fi
 
 for i in $(seq 1 30); do
-  if dc exec -T db pg_isready -U postgres -d lao_rice >/dev/null 2>&1; then
+  if vps_dc exec -T db pg_isready -U postgres -d lao_rice >/dev/null 2>&1; then
     break
   fi
   sleep 1
@@ -91,17 +89,24 @@ echo "==> Build API"
 /usr/local/go/bin/go mod download
 /usr/local/go/bin/go build -o "$BIN" ./cmd/server
 
+echo "==> Ensure default admin (seed)"
+set -a
+# shellcheck disable=SC1091
+[ -f "$APP_DIR/.env" ] && source "$APP_DIR/.env"
+set +a
+/usr/local/go/bin/go run ./cmd/seed -admin-only
+
 echo "==> Install systemd unit (if ExecStart path changed)"
 sudo -n cp deploy/lao-rice-api.service /etc/systemd/system/lao-rice-api.service
-sudo -n systemctl daemon-reload
+vps_sudo_systemctl daemon-reload
 
 echo "==> Restart service"
 docker rm -f lao-rice-api 2>/dev/null || true
-sudo -n systemctl restart "$SERVICE"
+vps_sudo_systemctl restart "$SERVICE"
 sleep 2
-if ! sudo -n systemctl is-active --quiet "$SERVICE"; then
+if ! vps_sudo_systemctl is-active --quiet "$SERVICE"; then
   echo "Service failed to start:"
-  sudo -n systemctl status "$SERVICE" --no-pager -l || true
+  vps_sudo_systemctl status "$SERVICE" --no-pager -l || true
   sudo -n journalctl -u "$SERVICE" -n 50 --no-pager || true
   exit 1
 fi
