@@ -17,6 +17,7 @@ func New(
 	categoryH *handler.CategoryHandler,
 	productH *handler.ProductHandler,
 	orderH *handler.OrderHandler,
+	shopSettingsH *handler.ShopSettingsHandler,
 	exchangeH *handler.ExchangeRateHandler,
 	bannerH *handler.BannerHandler,
 	uploadDir string,
@@ -79,6 +80,7 @@ func New(
 	r.GET("/banners/:id", middleware.OptionalJWTAuth(auth), bannerH.Get)
 
 	r.GET("/orders/shipping-config", orderH.ShippingConfig)
+	r.GET("/shop-settings", shopSettingsH.Get)
 	r.GET("/orders/shipping-quote", orderH.QuoteShipping)
 	r.GET("/ordersbyphone", orderH.ListByPhone)
 
@@ -102,6 +104,7 @@ func New(
 		protected.PUT("/orders/:id/status", middleware.RequireAdmin(), orderH.UpdateStatus)
 
 		protected.PUT("/exchange-rate", middleware.RequireAdmin(), exchangeH.Set)
+		protected.PUT("/shop-settings", middleware.RequireAdmin(), shopSettingsH.Update)
 
 		protected.POST("/banners/upload-image", middleware.RequireAdmin(), bannerH.UploadImage)
 		protected.POST("/banners", middleware.RequireAdmin(), bannerH.Create)

@@ -70,7 +70,12 @@ func (h *OrderHandler) ListByPhone(c *gin.Context) {
 }
 
 func (h *OrderHandler) ShippingConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, h.orders.ShippingConfig())
+	view, err := h.orders.ShippingConfig(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, view)
 }
 
 func (h *OrderHandler) QuoteShipping(c *gin.Context) {
@@ -87,7 +92,12 @@ func (h *OrderHandler) QuoteShipping(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, h.orders.QuoteShipping(subtotal))
+	view, err := h.orders.QuoteShipping(c.Request.Context(), subtotal)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, view)
 }
 
 // Place creates an order (public). Accepts JSON or multipart/form-data (with payment_receipt file).
