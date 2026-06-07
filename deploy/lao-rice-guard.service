@@ -1,0 +1,8 @@
+[Unit]
+Description=Lao Rice API guard (DB sync + health check)
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/lao-rice-api
+ExecStart=/bin/bash /opt/lao-rice-api/deploy/ensure-db-login.sh

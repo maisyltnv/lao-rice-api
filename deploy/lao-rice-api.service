@@ -1,6 +1,7 @@
 [Unit]
 Description=Lao Rice API
-After=network.target docker.service
+After=network-online.target docker.service
+Wants=network-online.target
 Requires=docker.service
 
 [Service]
@@ -10,6 +11,7 @@ EnvironmentFile=/opt/lao-rice-api/.env
 ExecStart=/opt/lao-rice-api/bin/lao-rice-api
 Restart=always
 RestartSec=5
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

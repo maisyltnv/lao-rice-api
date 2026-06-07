@@ -2,3 +2,4 @@
 .db_password
 bin/lao-rice-api
 uploads/
+backups/
