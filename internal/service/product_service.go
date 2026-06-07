@@ -52,6 +52,7 @@ type CreateProductInput struct {
 	Name             string
 	Description      string
 	ImageURL         string
+	ImageURLs        []string
 	CategoryID       *uint64
 	OriginalPriceCNY float64
 	ExchangeRate     float64
@@ -65,6 +66,8 @@ type UpdateProductInput struct {
 	Name             *string
 	Description      *string
 	ImageURL         *string
+	ImageURLs        []string
+	HasImageURLs     bool
 	ClearCategory    bool
 	CategoryID       *uint64
 	OriginalPriceCNY *float64
@@ -93,6 +96,7 @@ func (s *ProductService) Create(ctx context.Context, in CreateProductInput) (*mo
 		Name:             in.Name,
 		Description:      in.Description,
 		ImageURL:         in.ImageURL,
+		ImageURLs:        model.NormalizeProductImageURLs(in.ImageURLs, in.ImageURL),
 		CategoryID:       in.CategoryID,
 		OriginalPriceCNY: in.OriginalPriceCNY,
 		ExchangeRate:     in.ExchangeRate,
@@ -145,8 +149,10 @@ func (s *ProductService) Update(ctx context.Context, id uint64, in UpdateProduct
 	if in.Description != nil {
 		p.Description = *in.Description
 	}
-	if in.ImageURL != nil {
-		p.ImageURL = *in.ImageURL
+	if in.HasImageURLs {
+		p.ImageURLs = model.NormalizeProductImageURLs(in.ImageURLs, p.ImageURL)
+	} else if in.ImageURL != nil {
+		p.ImageURLs = model.NormalizeProductImageURLs(nil, *in.ImageURL)
 	}
 	if in.OriginalPriceCNY != nil {
 		p.OriginalPriceCNY = *in.OriginalPriceCNY

@@ -77,6 +77,16 @@ func open(dsn string) (*gorm.DB, error) {
 	`).Error; err != nil {
 		return nil, fmt.Errorf("migrate order status: %w", err)
 	}
+	// Backfill product gallery JSON from legacy cover image_url.
+	if err := db.Exec(`
+		UPDATE products
+		SET image_urls_json = to_json(ARRAY[image_url]::text[])::text
+		WHERE (image_urls_json IS NULL OR image_urls_json = '')
+		  AND image_url IS NOT NULL
+		  AND image_url <> ''
+	`).Error; err != nil {
+		return nil, fmt.Errorf("backfill product image_urls_json: %w", err)
+	}
 
 	return db, nil
 }
