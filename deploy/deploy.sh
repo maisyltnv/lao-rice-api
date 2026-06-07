@@ -30,7 +30,7 @@ echo "==> Pull latest main"
 git fetch origin main
 git reset --hard origin/main
 
-chmod +x deploy/deploy.sh deploy/wait-for-db.sh 2>/dev/null || true
+chmod +x deploy/deploy.sh deploy/wait-for-db.sh deploy/backup-db.sh deploy/restore-db.sh deploy/ensure-db-login.sh deploy/cron-backup.sh deploy/cron-health.sh deploy/install-guards.sh 2>/dev/null || true
 
 _cksum_after="$(cksum "$DEPLOY_SCRIPT" | awk '{print $1}')"
 if [ -n "$_cksum_before" ] && [ "$_cksum_before" != "$_cksum_after" ] && [ -z "${DEPLOY_REEXEC:-}" ]; then
@@ -46,7 +46,7 @@ if [ -s "$ENV_BACKUP" ]; then
   JWT_SECRET="$(grep -E '^JWT_SECRET=' "$ENV_BACKUP" | head -1 | cut -d= -f2- || true)"
 fi
 if [ -f "$APP_DIR/.db_password" ]; then
-  DB_PASSWORD="$(cat "$APP_DIR/.db_password")"
+  DB_PASSWORD="$(tr -d '\n' < "$APP_DIR/.db_password")"
   cat > "$APP_DIR/.env" <<EOF
 PORT=${API_PORT}
 DATABASE_URL=postgres://postgres:${DB_PASSWORD}@localhost:5433/lao_rice?sslmode=disable
@@ -60,9 +60,17 @@ IMAGES_DIR=${APP_DIR}/images
 EOF
 elif [ -s "$ENV_BACKUP" ]; then
   cp "$ENV_BACKUP" "$APP_DIR/.env"
-elif [ -f "$APP_DIR/.env.example" ]; then
-  cp "$APP_DIR/.env.example" "$APP_DIR/.env"
-  sed -i "s|^UPLOAD_DIR=.*|UPLOAD_DIR=${APP_DIR}/uploads|" "$APP_DIR/.env"
+  _url="$(grep -E '^DATABASE_URL=' "$APP_DIR/.env" | head -1 | cut -d= -f2- || true)"
+  _pass="$(echo "$_url" | sed -n 's|.*postgres://postgres:\([^@]*\)@.*|\1|p')"
+  if [ -n "$_pass" ]; then
+    printf '%s' "$_pass" > "$APP_DIR/.db_password"
+    chmod 600 "$APP_DIR/.db_password"
+    echo "==> Created .db_password from .env backup"
+  fi
+else
+  echo "ERROR: missing $APP_DIR/.db_password — create it before deploy:" >&2
+  echo "  echo -n 'YOUR_DB_PASSWORD' > $APP_DIR/.db_password && chmod 600 $APP_DIR/.db_password" >&2
+  exit 1
 fi
 rm -f "$ENV_BACKUP"
 mkdir -p "$APP_DIR/uploads/payment-receipts"
@@ -85,6 +93,16 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+echo "==> Verify database login"
+bash "$APP_DIR/deploy/ensure-db-login.sh"
+
+echo "==> Backup database (before deploy)"
+if bash "$APP_DIR/deploy/backup-db.sh"; then
+  echo "==> Backup OK"
+else
+  echo "WARN: backup failed — deploy continues (check docker / postgres)"
+fi
+
 echo "==> Build API"
 /usr/local/go/bin/go mod download
 /usr/local/go/bin/go build -o "$BIN" ./cmd/server
@@ -98,7 +116,11 @@ set +a
 
 echo "==> Install systemd unit (if ExecStart path changed)"
 sudo -n cp deploy/lao-rice-api.service /etc/systemd/system/lao-rice-api.service
+sudo -n cp deploy/lao-rice-guard.service /etc/systemd/system/lao-rice-guard.service 2>/dev/null || true
+sudo -n cp deploy/lao-rice-guard.timer /etc/systemd/system/lao-rice-guard.timer 2>/dev/null || true
 vps_sudo_systemctl daemon-reload
+sudo -n systemctl enable lao-rice-guard.timer 2>/dev/null || true
+sudo -n systemctl start lao-rice-guard.timer 2>/dev/null || true
 
 echo "==> Restart service"
 docker rm -f lao-rice-api 2>/dev/null || true
