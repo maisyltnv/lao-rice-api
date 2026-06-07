@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"shopapi/internal/model"
 	"shopapi/internal/service"
 	"shopapi/internal/upload"
 
@@ -32,6 +33,12 @@ func (h *ProductHandler) maybeDeleteManagedImage(oldURL string) {
 	_ = h.images.DeleteByURL(oldURL)
 }
 
+func (h *ProductHandler) maybeDeleteManagedImages(urls []string) {
+	for _, u := range urls {
+		h.maybeDeleteManagedImage(u)
+	}
+}
+
 // UploadImage accepts multipart field "image" and returns a public path for image_url.
 func (h *ProductHandler) UploadImage(c *gin.Context) {
 	if h.images == nil {
@@ -55,6 +62,7 @@ type createProductRequest struct {
 	Name             string   `json:"name" binding:"required"`
 	Description      string   `json:"description"`
 	ImageURL         string   `json:"image_url"`
+	ImageURLs        []string `json:"image_urls"`
 	CategoryID       *uint64  `json:"category_id" binding:"required"`
 	OriginalPriceCNY float64  `json:"original_price_cny" binding:"required,gte=0"`
 	ExchangeRate     float64  `json:"exchange_rate" binding:"required,gte=0"`
@@ -74,6 +82,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		Name:             req.Name,
 		Description:      req.Description,
 		ImageURL:         req.ImageURL,
+		ImageURLs:        req.ImageURLs,
 		CategoryID:       req.CategoryID,
 		OriginalPriceCNY: req.OriginalPriceCNY,
 		ExchangeRate:     req.ExchangeRate,
@@ -135,6 +144,7 @@ type updateProductRequest struct {
 	Name             *string  `json:"name"`
 	Description      *string  `json:"description"`
 	ImageURL         *string  `json:"image_url"`
+	ImageURLs        []string `json:"image_urls"`
 	ClearCategory    bool     `json:"clear_category"`
 	CategoryID       *uint64  `json:"category_id"`
 	OriginalPriceCNY *float64 `json:"original_price_cny"`
@@ -165,8 +175,9 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	oldURLs := model.ParseProductImageURLs(existing.ImageURLsJSON, existing.ImageURL)
 
-	p, err := h.svc.Update(c.Request.Context(), id, service.UpdateProductInput{
+	in := service.UpdateProductInput{
 		Name:             req.Name,
 		Description:      req.Description,
 		ImageURL:         req.ImageURL,
@@ -178,7 +189,13 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		FinalPriceLAK:    req.FinalPriceLAK,
 		Stock:            req.Stock,
 		SourceURL:        req.SourceURL,
-	})
+	}
+	if req.ImageURLs != nil {
+		in.ImageURLs = req.ImageURLs
+		in.HasImageURLs = true
+	}
+
+	p, err := h.svc.Update(c.Request.Context(), id, in)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -187,12 +204,10 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.ImageURL != nil {
-		newURL := strings.TrimSpace(*req.ImageURL)
-		oldURL := strings.TrimSpace(existing.ImageURL)
-		if newURL != "" && newURL != oldURL {
-			h.maybeDeleteManagedImage(oldURL)
-		}
+
+	newURLs := model.ParseProductImageURLs(p.ImageURLsJSON, p.ImageURL)
+	for _, removed := range model.RemovedProductImageURLs(oldURLs, newURLs) {
+		h.maybeDeleteManagedImage(removed)
 	}
 	c.JSON(http.StatusOK, p)
 }
@@ -209,7 +224,8 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 		return
 	}
 	if getErr == nil {
-		h.maybeDeleteManagedImage(existing.ImageURL)
+		oldURLs := model.ParseProductImageURLs(existing.ImageURLsJSON, existing.ImageURL)
+		h.maybeDeleteManagedImages(oldURLs)
 	}
 	c.Status(http.StatusNoContent)
 }
