@@ -50,19 +50,44 @@ if [ ! -f "$APP_DIR/.env" ]; then
   echo "ERROR: $APP_DIR/.env missing. Run deploy/reset-docker-production.sh first." >&2
   exit 1
 fi
-if ! grep -q '^DB_PASSWORD=' "$APP_DIR/.env"; then
-  echo "ERROR: .env must contain DB_PASSWORD=. Run deploy/reset-docker-production.sh" >&2
+
+# Migrate legacy .env (DATABASE_URL / .db_password) → Docker format (DB_PASSWORD)
+_db_pass=""
+if [ -f "$APP_DIR/.db_password" ]; then
+  _db_pass="$(tr -d '\n' < "$APP_DIR/.db_password")"
+fi
+if [ -z "$_db_pass" ] && grep -q '^DATABASE_URL=' "$APP_DIR/.env"; then
+  _db_pass="$(grep '^DATABASE_URL=' "$APP_DIR/.env" | sed -n 's|.*postgres://postgres:\([^@]*\)@.*|\1|p')"
+fi
+if [ -z "$_db_pass" ] && [ -s "$ENV_BACKUP" ] && grep -q '^DATABASE_URL=' "$ENV_BACKUP"; then
+  _db_pass="$(grep '^DATABASE_URL=' "$ENV_BACKUP" | sed -n 's|.*postgres://postgres:\([^@]*\)@.*|\1|p')"
+fi
+if [ -z "$_db_pass" ]; then
+  echo "ERROR: cannot find DB password in .env, .db_password, or backup." >&2
+  echo "Run: bash deploy/reset-docker-production.sh" >&2
   exit 1
 fi
-# Keep JWT_SECRET from backup if git reset overwrote .env keys we care about
-if [ -s "$ENV_BACKUP" ]; then
-  _jwt="$(grep -E '^JWT_SECRET=' "$ENV_BACKUP" | head -1 | cut -d= -f2- || true)"
-  if [ -n "$_jwt" ] && grep -q '^JWT_SECRET=' "$APP_DIR/.env"; then
-    sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${_jwt}|" "$APP_DIR/.env"
-  fi
-fi
+
+_jwt="$(grep -E '^JWT_SECRET=' "$APP_DIR/.env" | head -1 | cut -d= -f2- || true)"
+[ -n "$_jwt" ] || _jwt="$(grep -E '^JWT_SECRET=' "$ENV_BACKUP" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+[ -n "$_jwt" ] || _jwt="change-me-in-production-use-long-random-secret"
+_api_port="$(grep -E '^API_PORT=' "$APP_DIR/.env" | head -1 | cut -d= -f2- || true)"
+[ -n "$_api_port" ] || _api_port="$(grep -E '^PORT=' "$APP_DIR/.env" | head -1 | cut -d= -f2- || true)"
+[ -n "$_api_port" ] || _api_port="8081"
+
+cat > "$APP_DIR/.env" <<EOF
+DB_PASSWORD=${_db_pass}
+JWT_SECRET=${_jwt}
+API_PORT=${_api_port}
+JWT_EXPIRY_HOURS=72
+SHIPPING_FEE_LAK=30000
+FREE_SHIPPING_MIN_SUBTOTAL_LAK=500000
+EOF
+printf '%s' "$_db_pass" > "$APP_DIR/.db_password"
+chmod 600 "$APP_DIR/.db_password" "$APP_DIR/.env"
+echo "==> .env migrated to Docker format (DB_PASSWORD)"
+
 rm -f "$ENV_BACKUP"
-chmod 600 "$APP_DIR/.env"
 
 echo "==> Disable old systemd API (Docker mode)"
 sudo -n systemctl stop lao-rice-api lao-rice-guard.timer 2>/dev/null || true
@@ -71,6 +96,9 @@ sudo -n systemctl disable lao-rice-api lao-rice-guard.timer 2>/dev/null || true
 echo "==> Backup database (before deploy)"
 mkdir -p backups/postgres
 if dc ps --status running --services 2>/dev/null | grep -qx db; then
+  # sync password in existing volume to match .env (keeps data)
+  _escaped="$(printf '%s' "$_db_pass" | sed "s/'/''/g")"
+  dc exec -T db psql -U postgres -d lao_rice -c "ALTER USER postgres PASSWORD '${_escaped}';" 2>/dev/null || true
   bash "$APP_DIR/deploy/backup-db.sh" || echo "WARN: backup skipped"
 fi
 
