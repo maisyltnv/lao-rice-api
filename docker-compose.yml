@@ -11,7 +11,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: lao_rice
     ports:
-      - "5433:5432"
+      # Bind to loopback only — never expose Postgres to the public internet.
+      - "127.0.0.1:5433:5432"
     volumes:
       - lao_rice_pgdata:/var/lib/postgresql/data
     healthcheck:
