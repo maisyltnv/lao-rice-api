@@ -39,3 +39,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uint64) (*model.User, e
 func (r *UserRepository) Save(ctx context.Context, u *model.User) error {
 	return r.db.WithContext(ctx).Save(u).Error
 }
+
+// Delete permanently removes a user account (no soft-delete on the model).
+func (r *UserRepository) Delete(ctx context.Context, id uint64) error {
+	return r.db.WithContext(ctx).Delete(&model.User{}, id).Error
+}

@@ -188,6 +188,25 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, userJSON(u))
 }
 
+// DeleteMe permanently deletes the authenticated user's account and personal data.
+func (h *AuthHandler) DeleteMe(c *gin.Context) {
+	uidVal, ok := c.Get(middleware.ContextUserIDKey)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid, ok := uidVal.(uint64)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if err := h.auth.DeleteAccount(c.Request.Context(), uid); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": true})
+}
+
 // AdminMe returns the current user only if the JWT is for an admin (for admin SPA).
 func (h *AuthHandler) AdminMe(c *gin.Context) {
 	h.Me(c)
