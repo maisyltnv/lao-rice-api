@@ -16,6 +16,7 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /server ./server
+COPY --from=builder /app/images ./images
 
 RUN mkdir -p /app/uploads/payment-receipts /app/uploads/product-images /app/uploads/banner-images && chmod -R 777 /app/uploads
 
