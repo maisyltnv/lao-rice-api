@@ -211,6 +211,11 @@ func (s *AuthService) GetUserByID(ctx context.Context, id uint64) (*model.User, 
 	return s.users.GetByID(ctx, id)
 }
 
+// DeleteAccount permanently deletes the user's account and personal profile data.
+func (s *AuthService) DeleteAccount(ctx context.Context, id uint64) error {
+	return s.users.Delete(ctx, id)
+}
+
 // UpdateProfileInput is the customer default shipping address for checkout.
 type UpdateProfileInput struct {
 	RecipientName     string
