@@ -1,27 +1,12 @@
 name: lao-rice-api
 
-services:
-  db:
-    image: postgres:16-alpine
-    container_name: lao-rice-db
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: lao_rice
-    ports:
-      # Bind to loopback only — never expose Postgres to the public internet.
-      - "127.0.0.1:5433:5432"
-    volumes:
-      - lao_rice_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lao_rice"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+# Uses the shared PostgreSQL (container `shared_pg`, external network `sharedpg`)
+# instead of a per-project db container. Data lives in database "lao_rice" on
+# shared_pg, owned by role "laorice" (single role — no RLS). The password comes
+# from this box's unchanged .env (DB_PASSWORD), so a rollback to the prior
+# own-db compose still matches.
 
+services:
   api:
     build:
       context: .
@@ -34,7 +19,7 @@ services:
       - "${API_PORT:-8081}:8080"
     environment:
       PORT: "8080"
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-postgres}@db:5432/lao_rice?sslmode=disable
+      DATABASE_URL: postgres://laorice:${DB_PASSWORD:-postgres}@${DB_HOST:-shared_pg}:5432/lao_rice?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-use-long-random-secret}
       JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-72}
       SHIPPING_FEE_LAK: ${SHIPPING_FEE_LAK:-30000}
@@ -45,9 +30,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./images:/app/images
-    depends_on:
-      db:
-        condition: service_healthy
+    networks:
+      - default
+      - sharedpg
 
-volumes:
-  lao_rice_pgdata:
+networks:
+  sharedpg:
+    external: true
