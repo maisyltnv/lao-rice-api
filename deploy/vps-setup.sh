@@ -40,7 +40,7 @@ systemctl start docker
 
 if ! command -v go >/dev/null 2>&1 || ! go version | grep -q 'go1.2'; then
   echo "==> Install Go"
-  GO_VER="1.23.4"
+  GO_VER="1.26.9"
   curl -fsSL "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -o /tmp/go.tgz
   rm -rf /usr/local/go
   tar -C /usr/local -xzf /tmp/go.tgz
