@@ -8,6 +8,20 @@ name: lao-rice-api
 
 services:
   api:
+    # Hardening (2026-10-10, after a cryptominer was dropped into a container):
+    # read-only filesystem, /tmp that can't execute, no Linux capabilities, no
+    # privilege escalation, and CPU/memory/process caps so one compromised app
+    # can't run a dropped binary or take over the whole VPS.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop: [ALL]
+    # Runs as root but writes to media folders owned by the deploy user.
+    cap_add: [DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 256
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,7 +30,7 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "${API_PORT:-8081}:8080"
+      - "127.0.0.1:${API_PORT:-8081}:8080"   # Caddy is the only public entry point
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://laorice:${DB_PASSWORD:-postgres}@${DB_HOST:-shared_pg}:5432/lao_rice?sslmode=disable
